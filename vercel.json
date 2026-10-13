@@ -1,0 +1,8 @@
+{
+  "functions": {
+    "api/notices.js": {
+      "maxDuration": 60,
+      "memory": 512
+    }
+  }
+}
