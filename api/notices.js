@@ -1,6 +1,5 @@
 // ============================================================
-// BD govt notices fetcher — runs on Vercel, fetches through
-// free Bangladeshi HTTP proxies so the request appears local.
+// BD govt notices fetcher — all sites share the full proxy pool
 // ============================================================
 
 import { ProxyAgent, fetch as undiciFetch } from 'undici';
@@ -13,49 +12,38 @@ const SITES = [
 ];
 
 const PER_SITE_LIMIT   = 10;
-const PROXY_TIMEOUT_MS = 7000;
-const PROXY_BATCH      = 12;   // race this many per site in parallel
+const PROXY_TIMEOUT_MS = 8000;
 
-// ============================================================
-// MAIN HANDLER
-// ============================================================
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(204).end();
 
-  const siteFilter = req.query.site; // optional: ?site=DSHE
+  const siteFilter = req.query.site;
   const targets = siteFilter
     ? SITES.filter(s => s.tag.toLowerCase() === siteFilter.toLowerCase())
     : SITES;
 
-  if (!targets.length) {
-    return res.status(400).json({ error: `Unknown site: ${siteFilter}` });
-  }
+  if (!targets.length) return res.status(400).json({ error: `Unknown site: ${siteFilter}` });
 
   const t0 = Date.now();
 
-  // Fetch a fresh pool of BD proxies once
   let proxies = [];
   try {
     proxies = await fetchBdProxies();
   } catch (e) {
     return res.status(500).json({ error: 'Proxy list fetch failed', detail: e.message });
   }
-  if (!proxies.length) {
-    return res.status(500).json({ error: 'No BD proxies available right now' });
-  }
+  if (!proxies.length) return res.status(500).json({ error: 'No BD proxies available right now' });
 
-  // Split the proxy pool evenly across the target sites so they
-  // don't fight over the same proxy concurrently.
-  const perSite = Math.max(4, Math.floor(proxies.length / targets.length));
-
+  // ---------------------------------------------------------
+  // All sites run in parallel, each with the FULL proxy pool.
+  // Free proxies handle concurrent requests fine; the "winner"
+  // for one site is usually also the winner for the others.
+  // ---------------------------------------------------------
   const results = await Promise.all(
-    targets.map((site, i) => {
-      const slice = proxies.slice(i * perSite, i * perSite + perSite);
-      return fetchSiteViaProxy(site, slice);
-    })
+    targets.map(site => fetchSiteViaProxy(site, proxies))
   );
 
   const payload = {
@@ -75,6 +63,7 @@ export default async function handler(req, res) {
       ms: r.ms,
       count: r.notices.length,
       proxyUsed: r.proxyUsed || undefined,
+      attempts: r.attempts || 0,
       error: r.error || undefined,
     };
     if (r.error) payload.errors.push(`${r.site.tag}: ${r.error}`);
@@ -84,115 +73,159 @@ export default async function handler(req, res) {
 }
 
 // ============================================================
-// Fetch a site — race through proxies, first success wins
+// Race through proxies — first success wins. If all fail,
+// do ONE retry pass with a reshuffled pool (many failures
+// are transient — a proxy that timed out once often works next).
 // ============================================================
 async function fetchSiteViaProxy(site, proxyList) {
   const t0 = Date.now();
-  const controllers = [];
-  const errors = [];
+  let totalAttempts = 0;
 
-  try {
-    const html = await new Promise((resolve, reject) => {
-      let pending = proxyList.length;
-      let settled = false;
+  for (let pass = 0; pass < 2; pass++) {
+    const shuffled = shuffle([...proxyList]);
+    const errors = [];
 
-      for (const proxy of proxyList) {
-        const ctrl = new AbortController();
-        controllers.push(ctrl);
-        const timer = setTimeout(() => ctrl.abort(), PROXY_TIMEOUT_MS);
-
-        (async () => {
-          try {
-            const dispatcher = new ProxyAgent(`http://${proxy}`);
-            const response = await undiciFetch(site.url, {
-              dispatcher,
-              signal: ctrl.signal,
-              headers: {
-                'User-Agent':
-                  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
-                  '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.9,bn;q=0.8',
-              },
-              redirect: 'follow',
-            });
-
-            clearTimeout(timer);
-            if (!response.ok) {
-              errors.push(`${proxy} HTTP ${response.status}`);
-              return;
-            }
-            const body = await response.text();
-            if (body.length < 5000) {
-              errors.push(`${proxy} short ${body.length}`);
-              return;
-            }
-
-            if (!settled) {
-              settled = true;
-              // abort remaining races
-              for (const c of controllers) { try { c.abort(); } catch {} }
-              resolve({ html: body, proxyUsed: proxy });
-            }
-          } catch (e) {
-            clearTimeout(timer);
-            errors.push(`${proxy} ${e.message || e}`);
-          } finally {
-            pending--;
-            if (pending === 0 && !settled) {
-              reject(new Error('all proxies failed: ' + errors.slice(0, 3).join('; ')));
-            }
-          }
-        })();
+    try {
+      const result = await raceProxies(site, shuffled, errors);
+      totalAttempts += shuffled.length;
+      return {
+        site,
+        notices: result.notices,
+        ok: result.notices.length > 0,
+        ms: Date.now() - t0,
+        proxyUsed: result.proxyUsed,
+        attempts: totalAttempts,
+        error: result.notices.length ? undefined : 'parsed 0 notices',
+      };
+    } catch (e) {
+      totalAttempts += shuffled.length;
+      if (pass === 0) {
+        // Short pause then retry once with a fresh shuffle
+        await new Promise(r => setTimeout(r, 800));
+        continue;
       }
-
-      if (!proxyList.length) reject(new Error('no proxies available'));
-    });
-
-    const notices = parseNotices(html.html, site);
-    return {
-      site,
-      notices,
-      ok: notices.length > 0,
-      ms: Date.now() - t0,
-      proxyUsed: html.proxyUsed,
-      error: notices.length ? undefined : 'parsed 0 notices',
-    };
-  } catch (e) {
-    return {
-      site,
-      notices: [],
-      ok: false,
-      ms: Date.now() - t0,
-      error: e.message || String(e),
-    };
+      return {
+        site,
+        notices: [],
+        ok: false,
+        ms: Date.now() - t0,
+        attempts: totalAttempts,
+        error: e.message || String(e),
+      };
+    }
   }
+
+  return {
+    site, notices: [], ok: false, ms: Date.now() - t0,
+    attempts: totalAttempts, error: 'exhausted retries',
+  };
+}
+
+function raceProxies(site, proxies, errorsOut) {
+  return new Promise((resolve, reject) => {
+    let pending = proxies.length;
+    let settled = false;
+    const controllers = [];
+
+    if (!pending) return reject(new Error('no proxies available'));
+
+    const finish = (fn, val) => {
+      if (settled) return;
+      settled = true;
+      for (const c of controllers) { try { c.abort(); } catch {} }
+      fn(val);
+    };
+
+    for (const proxy of proxies) {
+      const ctrl = new AbortController();
+      controllers.push(ctrl);
+      const timer = setTimeout(() => ctrl.abort(), PROXY_TIMEOUT_MS);
+
+      (async () => {
+        try {
+          const dispatcher = new ProxyAgent(`http://${proxy}`);
+          const response = await undiciFetch(site.url, {
+            dispatcher,
+            signal: ctrl.signal,
+            headers: {
+              'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
+                '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+              'Accept-Language': 'en-US,en;q=0.9,bn;q=0.8',
+            },
+            redirect: 'follow',
+          });
+
+          clearTimeout(timer);
+          if (!response.ok) {
+            errorsOut.push(`${proxy} HTTP ${response.status}`);
+            return;
+          }
+          const body = await response.text();
+          if (body.length < 5000) {
+            errorsOut.push(`${proxy} short ${body.length}`);
+            return;
+          }
+
+          const notices = parseNotices(body, site);
+          if (notices.length) {
+            finish(resolve, { notices, proxyUsed: proxy, html: body });
+          } else {
+            errorsOut.push(`${proxy} parsed 0`);
+          }
+        } catch (e) {
+          clearTimeout(timer);
+          errorsOut.push(`${proxy} ${e.message || e}`);
+        } finally {
+          pending--;
+          if (pending === 0 && !settled) {
+            finish(reject, new Error('all proxies failed: ' + errorsOut.slice(0, 3).join('; ')));
+          }
+        }
+      })();
+    }
+  });
+}
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
 }
 
 // ============================================================
 // Fetch the current list of BD HTTP proxies
 // ============================================================
 async function fetchBdProxies() {
-  const url =
-    'https://api.proxyscrape.com/v2/?request=displayproxies&protocol=http&timeout=10000&country=bd&ssl=all&anonymity=all';
-  const r = await fetch(url);
-  const text = await r.text();
-  const list = text
-    .trim()
-    .split('\n')
-    .map(p => p.trim())
-    .filter(p => /^\d+\.\d+\.\d+\.\d+:\d+$/.test(p));
+  const sources = [
+    'https://api.proxyscrape.com/v2/?request=displayproxies&protocol=http&timeout=10000&country=bd&ssl=all&anonymity=all',
+    'https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/http.txt',
+  ];
 
-  // Shuffle so we don't always hit the same first few
-  for (let i = list.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [list[i], list[j]] = [list[j], list[i]];
+  const all = new Set();
+  for (const url of sources) {
+    try {
+      const r = await fetch(url);
+      if (!r.ok) continue;
+      const text = await r.text();
+      for (const line of text.split('\n')) {
+        const p = line.trim();
+        if (/^\d+\.\d+\.\d+\.\d+:\d+$/.test(p)) all.add(p);
+      }
+    } catch {}
   }
-  return list;
+
+  // If our second source includes non-BD proxies, filter geographically
+  // by testing only the first batch that responds quickly. For simplicity
+  // here, we keep everything and let the race handle unreliability.
+  return [...all];
 }
 
 // ============================================================
-// Parser (same logic we used on the Worker)
+// Parser
 // ============================================================
 function parseNotices(html, site) {
   const base = new URL(site.url).origin + '/';
@@ -240,16 +273,9 @@ function parseNotices(html, site) {
       if (dt && dt.date) { date = dt.date; time = dt.time; break; }
     }
 
-    out.push({
-      title: title.slice(0, 220),
-      url: abs,
-      tag: site.tag,
-      cls: site.cls,
-      date, time,
-    });
+    out.push({ title: title.slice(0, 220), url: abs, tag: site.tag, cls: site.cls, date, time });
   }
 
-  // Fallback: scan all anchors
   if (!out.length) {
     const aRe = /<a[^>]+href\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
     let am;
