@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Govt Notices</title>
+<style>
+  :root{--bg:#0f172a;--card:#1e293b;--border:#334155;--text:#e2e8f0;--muted:#94a3b8;--accent:#38bdf8;--star:#fbbf24;--unread:#ef4444}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text)}
+  header{padding:20px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  h1{font-size:18px;margin:0;flex:1;display:flex;align-items:center;gap:8px}
+  h1 .badge{background:var(--unread);color:#fff;font-size:12px;padding:2px 8px;border-radius:999px;font-weight:700;display:none}
+  h1 .badge.show{display:inline-block}
+  button{background:var(--accent);color:#0f172a;border:0;padding:8px 14px;border-radius:6px;font-weight:600;cursor:pointer;font-family:inherit;font-size:13px}
+  button:disabled{opacity:.5;cursor:wait}
+  button.secondary{background:transparent;color:var(--text);border:1px solid var(--border)}
+  button.secondary.active{background:var(--accent);color:#0f172a;border-color:var(--accent)}
+  .updated{color:var(--muted);font-size:12px;padding:0 20px 8px}
+  .controls{padding:12px 20px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .controls.second{padding-top:0}
+  input,select{background:var(--card);color:var(--text);border:1px solid var(--border);padding:8px 10px;border-radius:6px;font-size:14px;font-family:inherit}
+  input{flex:1;min-width:200px}
+  select{cursor:pointer}
+  .tabs{display:flex;gap:8px;flex-wrap:wrap}
+  .tab{background:transparent;color:var(--muted);border:1px solid var(--border);padding:6px 12px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px;transition:.15s}
+  .tab:hover{color:var(--text);border-color:var(--accent)}
+  .tab.active{background:var(--accent);color:#0f172a;border-color:var(--accent)}
+  .tab.starred-tab{color:var(--star)}
+  .tab.starred-tab.active{background:var(--star);color:#0f172a;border-color:var(--star)}
+  .tab .count{background:rgba(15,23,42,.35);color:inherit;font-size:11px;padding:1px 6px;border-radius:999px;font-variant-numeric:tabular-nums}
+  .tab:not(.active) .count{background:var(--border);color:var(--text)}
+  .tab .unread-dot{width:8px;height:8px;border-radius:50%;background:var(--unread);display:none}
+  .tab.has-unread .unread-dot{display:inline-block}
+  .status{padding:0 20px 10px;color:var(--muted);font-size:13px;min-height:18px}
+  .status .err{color:#f87171}
+  .status .ok{color:#4ade80}
+  .status .warn{color:#facc15}
+  .grid{padding:0 20px 40px;display:grid;gap:10px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;animation:fadeIn .35s ease-out both;position:relative}
+  .card.unread{border-left:3px solid var(--unread)}
+  .card.starred{border-left:3px solid var(--star)}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .star-btn{background:transparent;border:0;padding:4px;cursor:pointer;color:var(--muted);font-size:16px;line-height:1;flex-shrink:0;transition:.15s}
+  .star-btn:hover{color:var(--star);transform:scale(1.15)}
+  .star-btn.on{color:var(--star)}
+  .serial{color:var(--muted);font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;flex-shrink:0;min-width:22px}
+  .title{color:#f8fafc;text-decoration:none;font-size:15px;font-weight:500;line-height:1.45;flex:1 1 260px;min-width:0;word-break:break-word}
+  .title:hover{color:var(--accent)}
+  .card.unread .title{font-weight:600}
+  .date{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums;flex-shrink:0}
+  .tag{font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;text-transform:uppercase;flex-shrink:0;color:#0f172a;white-space:nowrap}
+  .tag.dshe{background:#38bdf8}
+  .tag.shed{background:#facc15}
+  .tag.bteb{background:#a78bfa}
+  .tag.techedu{background:#4ade80}
+  .tag.dhakaschool{background:#fb7185}
+  .tag.dhakacollege{background:#f97316}
+  .tag.dhakajsc{background:#22d3ee}
+  .tag.dhakassc{background:#a3e635}
+  .tag.dhakahsc{background:#e879f9}
+  mark{background:#fde047;color:#0f172a;padding:0 2px;border-radius:2px}
+  .spinner{display:inline-block;width:12px;height:12px;vertical-align:middle;margin-right:6px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .empty{color:var(--muted);padding:40px;text-align:center}
+  details{margin:0 20px 12px;color:var(--muted);font-size:12px;background:var(--card);border:1px solid var(--border);border-radius:8px}
+  details summary{padding:10px 14px;cursor:pointer;font-weight:600;user-select:none;list-style:none}
+  details summary::-webkit-details-marker{display:none}
+  details summary::before{content:"▸ ";display:inline-block;transition:transform .15s}
+  details[open] summary::before{transform:rotate(90deg)}
+  details pre{margin:0 14px 12px;background:#0b1220;padding:10px;border-radius:6px;overflow:auto;max-height:260px;white-space:pre-wrap;word-break:break-word;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;line-height:1.55;color:#cbd5e1}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📢 Govt Notices <span class="badge" id="unreadBadge">0</span></h1>
+  <button id="notifBtn" class="secondary">🔔 Enable alerts</button>
+  <button id="forceRefresh" class="secondary">Force crawl</button>
+  <button id="clear" class="secondary">Clear local cache</button>
+</header>
+
+<div class="updated" id="updated"></div>
+
+<details>
+  <summary>Debug log</summary>
+  <pre id="log"></pre>
+</details>
+
+<div class="controls">
+  <input id="search" placeholder="Search title...">
+  <div class="tabs" id="tabs"></div>
+</div>
+
+<div class="controls second">
+  <select id="dateFilter">
+    <option value="all">All dates</option>
+    <option value="day">Today</option>
+    <option value="week">This week</option>
+    <option value="month">This month</option>
+  </select>
+  <input id="keywords" placeholder="Alert keywords (comma-separated, e.g. পরীক্ষা, ছুটি)">
+</div>
+
+<div class="status" id="status"></div>
+<div class="grid" id="grid"></div>
+
+<script>
+const VERCEL_ENDPOINT = "/api/notices";
+const POLL_MS = 5 * 60 * 1000;   // 5 min — 9 sites per poll
+const LOCAL_CACHE_KEY = "govt_notices_vercel_v2";
+const SETTINGS_KEY = "govt_notices_settings_v1";
+const USER_STATE_KEY = "govt_notices_userstate_v1";
+
+const SITES = [
+  { tag: "DSHE",          cls: "dshe" },
+  { tag: "SHED",          cls: "shed" },
+  { tag: "BTEB",          cls: "bteb" },
+  { tag: "TechEdu",       cls: "techedu" },
+  { tag: "Dhaka-School",  cls: "dhakaschool" },
+  { tag: "Dhaka-College", cls: "dhakacollege" },
+  { tag: "Dhaka-JSC",     cls: "dhakajsc" },
+  { tag: "Dhaka-SSC",     cls: "dhakassc" },
+  { tag: "Dhaka-HSC",     cls: "dhakahsc" },
+];
+
+const state = { activeTag: "SHED", feed: {}, updatedAt: null, lastCrawledAt: null };
+const settings = { keywords: [], dateFilter: "all", notificationsEnabled: false };
+const userState = { seenUrls: new Set(), readUrls: new Set(), starredUrls: new Set() };
+
+let searchQuery = "";
+let pollTimer = null;
+
+const gridEl = document.getElementById("grid");
+const statusEl = document.getElementById("status");
+const tabsEl = document.getElementById("tabs");
+const searchEl = document.getElementById("search");
+const logEl = document.getElementById("log");
+const notifBtn = document.getElementById("notifBtn");
+const unreadBadge = document.getElementById("unreadBadge");
+const dateFilterEl = document.getElementById("dateFilter");
+const keywordsEl = document.getElementById("keywords");
+const updatedEl = document.getElementById("updated");
+
+function log(msg) {
+  console.log(msg);
+  logEl.textContent += `[${new Date().toLocaleTimeString()}] ${msg}\n`;
+  logEl.scrollTop = logEl.scrollHeight;
+}
+function setStatus(html, type = "") {
+  statusEl.innerHTML = type ? `<span class="${type}">${html}</span>` : html;
+}
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const BN_DIGITS = {"০":"0","১":"1","২":"2","৩":"3","৪":"4","৫":"5","৬":"6","৭":"7","৮":"8","৯":"9"};
+function bnToEn(s) { return String(s).replace(/[০-৯]/g, d => BN_DIGITS[d]); }
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+const MONTHS = { jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11 };
+function parseDateForFilter(d) {
+  if (!d) return null;
+  const s = bnToEn(String(d)).trim();
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (m) return new Date(+m[1], +m[2]-1, +m[3]);
+  m = s.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})$/);
+  if (m) { let y = +m[3]; if (y < 100) y += 2000; return new Date(y, +m[2]-1, +m[1]); }
+  m = s.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/);
+  if (m) {
+    const mon = MONTHS[m[2].toLowerCase().slice(0, 3)];
+    if (mon !== undefined) return new Date(+m[3], mon, +m[1]);
+  }
+  return null;
+}
+function isInDateRange(n) {
+  if (settings.dateFilter === "all") return true;
+  const d = parseDateForFilter(n.date);
+  if (!d) return false;
+  const now = new Date();
+  const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (settings.dateFilter === "day") return d >= midnight;
+  if (settings.dateFilter === "week") { const w = new Date(midnight); w.setDate(w.getDate() - 7); return d >= w; }
+  if (settings.dateFilter === "month") return d >= new Date(now.getFullYear(), now.getMonth(), 1);
+  return true;
+}
+function matchesKeywords(title) {
+  if (!settings.keywords.length) return false;
+  const lower = title.toLowerCase();
+  return settings.keywords.some(k => k && lower.includes(k.toLowerCase()));
+}
+function highlightTitle(title) {
+  let html = escapeHtml(title);
+  for (const kw of settings.keywords) {
+    if (!kw) continue;
+    const e = escapeHtml(kw).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    if (!e) continue;
+    html = html.replace(new RegExp("(" + e + ")", "gi"), "<mark>$1</mark>");
+  }
+  return html;
+}
+function relativeTime(iso) {
+  if (!iso) return "never";
+  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (diff < 60) return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
+  return `${Math.floor(diff/86400)}d ago`;
+}
+
+function saveSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch {} }
+function loadSettings() {
+  try {
+    const o = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}");
+    if (Array.isArray(o.keywords)) settings.keywords = o.keywords;
+    if (typeof o.dateFilter === "string") settings.dateFilter = o.dateFilter;
+    if (typeof o.notificationsEnabled === "boolean") settings.notificationsEnabled = o.notificationsEnabled;
+  } catch {}
+}
+function saveUserState() {
+  try { localStorage.setItem(USER_STATE_KEY, JSON.stringify({
+    seenUrls: [...userState.seenUrls], readUrls: [...userState.readUrls], starredUrls: [...userState.starredUrls]
+  })); } catch {}
+}
+function loadUserState() {
+  try {
+    const o = JSON.parse(localStorage.getItem(USER_STATE_KEY) || "{}");
+    if (Array.isArray(o.seenUrls)) o.seenUrls.forEach(u => userState.seenUrls.add(u));
+    if (Array.isArray(o.readUrls)) o.readUrls.forEach(u => userState.readUrls.add(u));
+    if (Array.isArray(o.starredUrls)) o.starredUrls.forEach(u => userState.starredUrls.add(u));
+  } catch {}
+}
+function saveLocalFeed() {
+  try { localStorage.setItem(LOCAL_CACHE_KEY, JSON.stringify({
+    feed: state.feed, updatedAt: state.updatedAt, lastCrawledAt: state.lastCrawledAt, savedAt: Date.now()
+  })); } catch {}
+}
+function loadLocalFeed() {
+  try {
+    const o = JSON.parse(localStorage.getItem(LOCAL_CACHE_KEY) || "null");
+    if (o && o.feed) {
+      state.feed = o.feed; state.updatedAt = o.updatedAt; state.lastCrawledAt = o.lastCrawledAt;
+      return true;
+    }
+  } catch {}
+  return false;
+}
+
+function updateNotifBtn() {
+  if (!("Notification" in window)) { notifBtn.textContent = "🔕 Not supported"; notifBtn.disabled = true; return; }
+  if (Notification.permission === "granted" && settings.notificationsEnabled) {
+    notifBtn.textContent = "🔔 Alerts on"; notifBtn.classList.add("active");
+  } else {
+    notifBtn.textContent = "🔔 Enable alerts"; notifBtn.classList.remove("active");
+  }
+}
+notifBtn.addEventListener("click", async () => {
+  if (!("Notification" in window)) return;
+  if (settings.notificationsEnabled) {
+    settings.notificationsEnabled = false; saveSettings(); updateNotifBtn();
+    setStatus("Alerts disabled.", "warn"); return;
+  }
+  const p = await Notification.requestPermission();
+  if (p === "granted") {
+    settings.notificationsEnabled = true; saveSettings(); updateNotifBtn();
+    setStatus("Alerts enabled.", "ok");
+  } else setStatus("Permission denied.", "err");
+});
+function fireNotification(title, body, url) {
+  if (!("Notification" in window) || Notification.permission !== "granted" || !settings.notificationsEnabled) return;
+  try {
+    const n = new Notification(title, { body, tag: "govt-notice" });
+    if (url) n.onclick = () => { window.open(url, "_blank"); n.close(); };
+  } catch {}
+}
+
+async function fetchFeed() {
+  const t0 = Date.now();
+  try {
+    const res = await fetch(VERCEL_ENDPOINT);
+    if (!res.ok) { log(`✗ Vercel HTTP ${res.status}`); return null; }
+    const data = await res.json();
+    log(`✓ Feed fetched in ${((Date.now() - t0)/1000).toFixed(2)}s · totalMs=${data.totalMs}ms`);
+    if (data.meta) {
+      for (const [tag, m] of Object.entries(data.meta)) {
+        const dedup = m.dedupedRemoved ? ` (deduped ${m.dedupedRemoved})` : "";
+        log(`  ${tag}: ${m.ok ? "✓" : "✗"} ${m.count}${dedup} in ${m.ms}ms${m.proxyUsed ? " via " + m.proxyUsed : ""}${m.error ? " — " + m.error : ""}`);
+      }
+    }
+    return data;
+  } catch (e) {
+    log(`✗ fetch error: ${e.message}`);
+    return null;
+  }
+}
+
+async function forceCrawl() {
+  const btn = document.getElementById("forceRefresh");
+  btn.disabled = true;
+  setStatus(`<span class="spinner"></span> Crawling 9 sites through BD proxies (~45s)…`);
+  log("════════ Force crawl ════════");
+  const data = await fetchFeed();
+  if (data) {
+    applyFeed(data, true);
+    setStatus(`Crawl complete · ${new Date().toLocaleTimeString()}`, "ok");
+  } else {
+    setStatus("Crawl failed — see debug log.", "err");
+  }
+  btn.disabled = false;
+}
+
+function applyFeed(data, isManualCrawl) {
+  if (!data || !data.sites) return;
+  const hadPrior = userState.seenUrls.size > 0;
+  const allNew = [];
+  for (const s of SITES) {
+    const notices = data.sites[s.tag] || [];
+    for (const n of notices) {
+      if (!userState.seenUrls.has(n.url)) {
+        userState.seenUrls.add(n.url);
+        allNew.push(n);
+      }
+    }
+  }
+  state.feed = data.sites;
+  state.updatedAt = data.updatedAt;
+  state.lastCrawledAt = data.lastCrawledAt;
+  saveLocalFeed();
+  saveUserState();
+
+  if (hadPrior && allNew.length && settings.notificationsEnabled) {
+    const kwNew = allNew.filter(n => matchesKeywords(n.title));
+    if (kwNew.length) {
+      fireNotification(`🔔 ${kwNew.length} keyword match${kwNew.length > 1 ? "es" : ""}`,
+        kwNew.slice(0, 3).map(n => n.title.slice(0, 80)).join("\n"), kwNew[0].url);
+    } else {
+      fireNotification(`📢 ${allNew.length} new notice${allNew.length > 1 ? "s" : ""}`,
+        allNew.slice(0, 3).map(n => n.title.slice(0, 80)).join("\n"), allNew[0].url);
+    }
+  }
+  renderAll();
+  if (!isManualCrawl) {
+    const total = SITES.reduce((sum, s) => sum + (state.feed[s.tag]?.length || 0), 0);
+    setStatus(`Showing ${total} notices · updated ${relativeTime(state.updatedAt)}`, "ok");
+  }
+}
+
+function activeNoticesForTag(tag) {
+  if (tag === "STARRED") {
+    const all = [];
+    for (const s of SITES) all.push(...(state.feed[s.tag] || []));
+    return all.filter(n => userState.starredUrls.has(n.url));
+  }
+  return state.feed[tag] || [];
+}
+function unreadCountForTag(tag) {
+  return activeNoticesForTag(tag).filter(n => !userState.readUrls.has(n.url)).length;
+}
+
+function renderTabs() {
+  const starredCount = activeNoticesForTag("STARRED").length;
+  const starredUnread = unreadCountForTag("STARRED");
+  const starredActive = state.activeTag === "STARRED";
+  const starred = `<button class="tab starred-tab ${starredActive ? "active" : ""}" data-tag="STARRED">
+    ★ Starred <span class="count">${starredCount}</span>
+    <span class="unread-dot" style="${starredUnread ? 'display:inline-block' : ''}"></span>
+  </button>`;
+  const sites = SITES.map(s => {
+    const arr = state.feed[s.tag] || [];
+    const isActive = state.activeTag === s.tag;
+    const unread = unreadCountForTag(s.tag);
+    const dot = unread > 0 ? 'style="display:inline-block"' : '';
+    return `<button class="tab ${isActive ? "active" : ""} ${unread ? "has-unread" : ""}" data-tag="${s.tag}">
+      ${s.tag} <span class="count">${arr.length}</span>
+      <span class="unread-dot" ${dot}></span>
+    </button>`;
+  }).join("");
+  tabsEl.innerHTML = starred + sites;
+}
+
+function updateUnreadBadge() {
+  let total = 0;
+  for (const s of SITES) total += unreadCountForTag(s.tag);
+  if (total > 0) {
+    unreadBadge.textContent = total;
+    unreadBadge.classList.add("show");
+    document.title = `(${total}) Govt Notices`;
+  } else {
+    unreadBadge.classList.remove("show");
+    document.title = "Govt Notices";
+  }
+}
+
+function renderGrid() {
+  const q = searchQuery.toLowerCase().trim();
+  const tag = state.activeTag;
+  const source = tag === "STARRED" ? activeNoticesForTag("STARRED") : (state.feed[tag] || []);
+  const list = source.filter(n => !q || n.title.toLowerCase().includes(q)).filter(isInDateRange);
+
+  if (!list.length) {
+    let msg;
+    if (tag === "STARRED") msg = "No starred notices yet — click ☆ on any card.";
+    else if (source.length) msg = "No matches for your filter.";
+    else msg = "No notices yet — click Force crawl to load.";
+    gridEl.innerHTML = `<div class="empty">${escapeHtml(msg)}</div>`;
+    return;
+  }
+
+  gridEl.innerHTML = list.map((n, i) => {
+    const stamp = [n.date, n.time].filter(Boolean).join(" ");
+    const isRead = userState.readUrls.has(n.url);
+    const isStarred = userState.starredUrls.has(n.url);
+    const kw = matchesKeywords(n.title);
+    const cls = ["card"]; if (!isRead) cls.push("unread"); if (isStarred) cls.push("starred");
+    return `
+      <div class="${cls.join(" ")}" style="animation-delay:${Math.min(i * 25, 300)}ms">
+        <button class="star-btn ${isStarred ? "on" : ""}" data-star="${escapeHtml(n.url)}">${isStarred ? "★" : "☆"}</button>
+        <span class="serial">${i + 1}.</span>
+        <a class="title" href="${n.url}" target="_blank" rel="noopener" data-read="${escapeHtml(n.url)}">
+          ${highlightTitle(n.title)}${kw ? ' <span style="color:#fbbf24;font-size:11px">●</span>' : ''}
+        </a>
+        ${stamp ? `<span class="date">${escapeHtml(stamp)}</span>` : ""}
+        <span class="tag ${n.cls || ""}">${n.tag}</span>
+      </div>
+    `;
+  }).join("");
+}
+
+function renderAll() { renderTabs(); renderGrid(); updateUnreadBadge(); }
+
+tabsEl.addEventListener("click", (e) => {
+  const btn = e.target.closest(".tab");
+  if (!btn) return;
+  const tag = btn.dataset.tag;
+  if (tag === state.activeTag) return;
+  state.activeTag = tag;
+  renderAll();
+});
+
+gridEl.addEventListener("click", (e) => {
+  const star = e.target.closest("[data-star]");
+  if (star) {
+    e.preventDefault(); e.stopPropagation();
+    const u = star.dataset.star;
+    if (userState.starredUrls.has(u)) userState.starredUrls.delete(u);
+    else userState.starredUrls.add(u);
+    saveUserState(); renderAll(); return;
+  }
+  const link = e.target.closest("[data-read]");
+  if (link) {
+    userState.readUrls.add(link.dataset.read);
+    saveUserState();
+    link.closest(".card")?.classList.remove("unread");
+    renderTabs(); updateUnreadBadge();
+  }
+});
+
+searchEl.addEventListener("input", (e) => { searchQuery = e.target.value; renderGrid(); });
+dateFilterEl.addEventListener("change", (e) => { settings.dateFilter = e.target.value; saveSettings(); renderGrid(); });
+keywordsEl.addEventListener("input", (e) => {
+  settings.keywords = e.target.value.split(",").map(k => k.trim()).filter(Boolean);
+  saveSettings(); renderGrid();
+});
+document.getElementById("forceRefresh").addEventListener("click", forceCrawl);
+document.getElementById("clear").addEventListener("click", () => {
+  localStorage.removeItem(LOCAL_CACHE_KEY);
+  state.feed = {}; state.updatedAt = null; state.lastCrawledAt = null;
+  renderAll();
+  setStatus("Local cache cleared.", "warn");
+});
+
+setInterval(() => {
+  const total = SITES.reduce((s, x) => s + (state.feed[x.tag]?.length || 0), 0);
+  updatedEl.textContent = state.updatedAt
+    ? `Data updated ${relativeTime(state.updatedAt)} · ${total} notices cached · auto-polls every 5 min`
+    : "Waiting for first crawl…";
+}, 30000);
+
+(function init() {
+  loadSettings();
+  loadUserState();
+  dateFilterEl.value = settings.dateFilter;
+  keywordsEl.value = settings.keywords.join(", ");
+  updateNotifBtn();
+
+  if (loadLocalFeed()) {
+    renderAll();
+    setStatus(`Loaded from local cache · updated ${relativeTime(state.updatedAt)}`);
+  } else {
+    gridEl.innerHTML = `<div class="empty">Loading…</div>`;
+  }
+
+  log(`✓ Endpoint: ${VERCEL_ENDPOINT}`);
+
+  (async () => {
+    const data = await fetchFeed();
+    if (data) applyFeed(data, false);
+    else if (!state.updatedAt) setStatus("Vercel endpoint not responding — click Force crawl.", "err");
+  })();
+
+  pollTimer = setInterval(async () => {
+    const data = await fetchFeed();
+    if (data) applyFeed(data, false);
+  }, POLL_MS);
+})();
+</script>
+</body>
+</html>
