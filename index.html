@@ -23,15 +23,18 @@
   input{flex:1;min-width:200px}
   select{cursor:pointer}
   .tabs{display:flex;gap:8px;flex-wrap:wrap}
-  .tab{background:transparent;color:var(--muted);border:1px solid var(--border);padding:6px 12px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px;transition:.15s}
+  .tab{background:transparent;color:var(--muted);border:1px solid var(--border);padding:6px 12px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px;transition:.15s;position:relative}
   .tab:hover{color:var(--text);border-color:var(--accent)}
   .tab.active{background:var(--accent);color:#0f172a;border-color:var(--accent)}
+  .tab.all-tab{color:#e2e8f0}
+  .tab.all-tab.active{background:#818cf8;color:#0f172a;border-color:#818cf8}
   .tab.starred-tab{color:var(--star)}
   .tab.starred-tab.active{background:var(--star);color:#0f172a;border-color:var(--star)}
   .tab .count{background:rgba(15,23,42,.35);color:inherit;font-size:11px;padding:1px 6px;border-radius:999px;font-variant-numeric:tabular-nums}
   .tab:not(.active) .count{background:var(--border);color:var(--text)}
   .tab .unread-dot{width:8px;height:8px;border-radius:50%;background:var(--unread);display:none}
   .tab.has-unread .unread-dot{display:inline-block}
+  .tab.loading .count::after{content:"…";margin-left:2px}
   .status{padding:0 20px 10px;color:var(--muted);font-size:13px;min-height:18px}
   .status .err{color:#f87171}
   .status .ok{color:#4ade80}
@@ -60,6 +63,9 @@
   .spinner{display:inline-block;width:12px;height:12px;vertical-align:middle;margin-right:6px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
   .empty{color:var(--muted);padding:40px;text-align:center}
+  .streaming-bar{position:sticky;top:0;z-index:10;background:linear-gradient(180deg,var(--bg) 80%,transparent);padding:8px 20px;display:none}
+  .streaming-bar.show{display:block}
+  .streaming-bar .msg{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--accent);background:var(--card);border:1px solid var(--border);padding:6px 12px;border-radius:999px}
   details{margin:0 20px 12px;color:var(--muted);font-size:12px;background:var(--card);border:1px solid var(--border);border-radius:8px}
   details summary{padding:10px 14px;cursor:pointer;font-weight:600;user-select:none;list-style:none}
   details summary::-webkit-details-marker{display:none}
@@ -78,6 +84,10 @@
 </header>
 
 <div class="updated" id="updated"></div>
+
+<div class="streaming-bar" id="streamingBar">
+  <span class="msg"><span class="spinner"></span><span id="streamingText">Fetching…</span></span>
+</div>
 
 <details>
   <summary>Debug log</summary>
@@ -105,7 +115,7 @@
 <script>
 const VERCEL_ENDPOINT = "/api/notices";
 const POLL_MS = 5 * 60 * 1000;
-const LOCAL_CACHE_KEY = "govt_notices_vercel_v3";
+const LOCAL_CACHE_KEY = "govt_notices_vercel_v5";
 const SETTINGS_KEY = "govt_notices_settings_v1";
 const USER_STATE_KEY = "govt_notices_userstate_v1";
 
@@ -117,12 +127,14 @@ const SITES = [
   { tag: "Dhaka",   cls: "dhaka" },
 ];
 
-const state = { activeTag: "SHED", feed: {}, updatedAt: null, lastCrawledAt: null };
+// Default = ALL
+const state = { activeTag: "ALL", feed: {}, updatedAt: null, lastCrawledAt: null };
 const settings = { keywords: [], dateFilter: "all", notificationsEnabled: false };
 const userState = { seenUrls: new Set(), readUrls: new Set(), starredUrls: new Set() };
 
 let searchQuery = "";
 let pollTimer = null;
+let streamActive = false;
 
 const gridEl = document.getElementById("grid");
 const statusEl = document.getElementById("status");
@@ -134,6 +146,8 @@ const unreadBadge = document.getElementById("unreadBadge");
 const dateFilterEl = document.getElementById("dateFilter");
 const keywordsEl = document.getElementById("keywords");
 const updatedEl = document.getElementById("updated");
+const streamingBar = document.getElementById("streamingBar");
+const streamingText = document.getElementById("streamingText");
 
 function log(msg) {
   console.log(msg);
@@ -265,87 +279,139 @@ function fireNotification(title, body, url) {
   } catch {}
 }
 
-async function fetchFeed() {
+// ============================================================
+// Streaming fetch — reads NDJSON line-by-line and renders
+// each site as soon as its chunk arrives.
+// ============================================================
+async function fetchFeedStreaming() {
   const t0 = Date.now();
+  streamActive = true;
+  streamingBar.classList.add("show");
+  streamingText.textContent = "Starting crawl…";
+  log("════════ Streaming crawl ════════");
+
+  let res;
   try {
-    const res = await fetch(VERCEL_ENDPOINT);
-    if (!res.ok) { log(`✗ Vercel HTTP ${res.status}`); return null; }
-    const data = await res.json();
-    log(`✓ Feed fetched in ${((Date.now() - t0)/1000).toFixed(2)}s · totalMs=${data.totalMs}ms`);
-    if (data.meta) {
-      for (const [tag, m] of Object.entries(data.meta)) {
-        if (tag === "Dhaka" && m.sections) {
-          const parts = Object.entries(m.sections).map(([k, v]) => `${k}:${v.count}`).join(" ");
-          log(`  Dhaka: ${m.ok ? "✓" : "✗"} ${m.count} total [${parts}] in ${m.ms}ms`);
-        } else {
-          log(`  ${tag}: ${m.ok ? "✓" : "✗"} ${m.count} in ${m.ms}ms${m.proxyUsed ? " via " + m.proxyUsed : ""}${m.error ? " — " + m.error : ""}`);
-        }
-      }
-    }
-    return data;
+    res = await fetch(VERCEL_ENDPOINT, { headers: { 'Accept': 'application/x-ndjson' } });
   } catch (e) {
     log(`✗ fetch error: ${e.message}`);
-    return null;
+    streamActive = false;
+    streamingBar.classList.remove("show");
+    return false;
   }
+  if (!res.ok || !res.body) {
+    log(`✗ HTTP ${res.status} — no stream body`);
+    streamActive = false;
+    streamingBar.classList.remove('show');
+    return false;
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let siteCount = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop();
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      let msg;
+      try { msg = JSON.parse(line); } catch { continue; }
+      if (msg.type === 'start') {
+        log(`↻ Stream started (proxies: ${msg.proxyPoolSize})`);
+      } else if (msg.type === 'site') {
+        siteCount++;
+        onSiteArrived(msg);
+      } else if (msg.type === 'done') {
+        log(`✓ Stream done in ${(msg.totalMs / 1000).toFixed(1)}s`);
+      } else if (msg.type === 'error') {
+        log(`✗ Stream error: ${msg.error}`);
+      }
+    }
+  }
+
+  streamActive = false;
+  streamingBar.classList.remove('show');
+  const total = SITES.reduce((s, x) => s + (state.feed[x.tag]?.length || 0), 0);
+  setStatus(`All done · ${total} notices · updated ${relativeTime(state.updatedAt)}`, "ok");
+  return true;
+}
+
+function onSiteArrived(msg) {
+  const tag = msg.tag;
+  const existing = state.feed[tag] || [];
+  const seen = new Set(existing.map(n => n.url));
+  const incoming = msg.notices || [];
+  const additions = incoming.filter(n => !seen.has(n.url));
+
+  state.feed[tag] = [...existing, ...additions];
+  state.updatedAt = new Date().toISOString();
+  state.lastCrawledAt = state.updatedAt;
+
+  // Detect truly new notices since last session (for notifications)
+  const hadPrior = userState.seenUrls.size > 0;
+  const brandNew = [];
+  for (const n of additions) {
+    if (!userState.seenUrls.has(n.url)) {
+      userState.seenUrls.add(n.url);
+      brandNew.push(n);
+    }
+  }
+
+  if (hadPrior && brandNew.length && settings.notificationsEnabled) {
+    const kwNew = brandNew.filter(n => matchesKeywords(n.title));
+    if (kwNew.length) {
+      fireNotification(`🔔 ${kwNew.length} keyword match${kwNew.length > 1 ? "es" : ""}`,
+        kwNew.slice(0, 3).map(n => n.title.slice(0, 80)).join("\n"), kwNew[0].url);
+    }
+  }
+
+  saveLocalFeed();
+  saveUserState();
+
+  // Render immediately — this is where the "instant" feel comes from
+  renderAll();
+
+  if (msg.ok) {
+    log(`  ✓ ${tag}${msg.section ? "/" + msg.section : ""}: ${incoming.length} in ${msg.ms}ms`);
+    streamingText.textContent = `Loaded ${tag}${msg.section ? " (" + msg.section + ")" : ""} — ${additions.length} new`;
+  } else {
+    log(`  ✗ ${tag}: ${msg.error || "no data"}`);
+  }
+  setStatus(`Loaded ${tag} — showing ${state.feed[state.activeTag]?.length || 0} in current tab.`, "ok");
 }
 
 async function forceCrawl() {
   const btn = document.getElementById("forceRefresh");
   btn.disabled = true;
-  setStatus(`<span class="spinner"></span> Crawling all sites through BD proxies (~50s)…`);
-  log("════════ Force crawl ════════");
-  const data = await fetchFeed();
-  if (data) {
-    applyFeed(data, true);
-    setStatus(`Crawl complete · ${new Date().toLocaleTimeString()}`, "ok");
-  } else {
-    setStatus("Crawl failed — see debug log.", "err");
-  }
+  streamingBar.classList.add("show");
+  streamingText.textContent = "Starting…";
+  const ok = await fetchFeedStreaming();
+  if (!ok) setStatus("Crawl failed — see debug log.", "err");
   btn.disabled = false;
 }
 
-function applyFeed(data, isManualCrawl) {
-  if (!data || !data.sites) return;
-  const hadPrior = userState.seenUrls.size > 0;
-  const allNew = [];
-  for (const s of SITES) {
-    const notices = data.sites[s.tag] || [];
-    for (const n of notices) {
-      if (!userState.seenUrls.has(n.url)) {
-        userState.seenUrls.add(n.url);
-        allNew.push(n);
-      }
-    }
-  }
-  state.feed = data.sites;
-  state.updatedAt = data.updatedAt;
-  state.lastCrawledAt = data.lastCrawledAt;
-  saveLocalFeed();
-  saveUserState();
-
-  if (hadPrior && allNew.length && settings.notificationsEnabled) {
-    const kwNew = allNew.filter(n => matchesKeywords(n.title));
-    if (kwNew.length) {
-      fireNotification(`🔔 ${kwNew.length} keyword match${kwNew.length > 1 ? "es" : ""}`,
-        kwNew.slice(0, 3).map(n => n.title.slice(0, 80)).join("\n"), kwNew[0].url);
-    } else {
-      fireNotification(`📢 ${allNew.length} new notice${allNew.length > 1 ? "s" : ""}`,
-        allNew.slice(0, 3).map(n => n.title.slice(0, 80)).join("\n"), allNew[0].url);
-    }
-  }
-  renderAll();
-  if (!isManualCrawl) {
-    const total = SITES.reduce((sum, s) => sum + (state.feed[s.tag]?.length || 0), 0);
-    setStatus(`Showing ${total} notices · updated ${relativeTime(state.updatedAt)}`, "ok");
-  }
+// ------------------------------------------------------------
+// Aggregation and rendering
+// ------------------------------------------------------------
+function allNotices() {
+  const all = [];
+  for (const s of SITES) all.push(...(state.feed[s.tag] || []));
+  all.sort((a, b) => {
+    const da = parseDateForFilter(a.date) || new Date(0);
+    const db = parseDateForFilter(b.date) || new Date(0);
+    return db - da;
+  });
+  return all;
 }
 
 function activeNoticesForTag(tag) {
-  if (tag === "STARRED") {
-    const all = [];
-    for (const s of SITES) all.push(...(state.feed[s.tag] || []));
-    return all.filter(n => userState.starredUrls.has(n.url));
-  }
+  if (tag === "ALL") return allNotices();
+  if (tag === "STARRED") return allNotices().filter(n => userState.starredUrls.has(n.url));
   return state.feed[tag] || [];
 }
 function unreadCountForTag(tag) {
@@ -353,13 +419,24 @@ function unreadCountForTag(tag) {
 }
 
 function renderTabs() {
+  const allCount = allNotices().length;
+  const allUnread = unreadCountForTag("ALL");
+  const allActive = state.activeTag === "ALL";
+
   const starredCount = activeNoticesForTag("STARRED").length;
   const starredUnread = unreadCountForTag("STARRED");
   const starredActive = state.activeTag === "STARRED";
-  const starred = `<button class="tab starred-tab ${starredActive ? "active" : ""}" data-tag="STARRED">
+
+  const allTab = `<button class="tab all-tab ${allActive ? "active" : ""}" data-tag="ALL">
+    All <span class="count">${allCount}</span>
+    <span class="unread-dot" style="${allUnread ? 'display:inline-block' : ''}"></span>
+  </button>`;
+
+  const starredTab = `<button class="tab starred-tab ${starredActive ? "active" : ""}" data-tag="STARRED">
     ★ Starred <span class="count">${starredCount}</span>
     <span class="unread-dot" style="${starredUnread ? 'display:inline-block' : ''}"></span>
   </button>`;
+
   const sites = SITES.map(s => {
     const arr = state.feed[s.tag] || [];
     const isActive = state.activeTag === s.tag;
@@ -371,7 +448,8 @@ function renderTabs() {
       <span class="unread-dot" ${dot}></span>
     </button>`;
   }).join("");
-  tabsEl.innerHTML = starred + sites;
+
+  tabsEl.innerHTML = allTab + starredTab + sites;
 }
 
 function updateUnreadBadge() {
@@ -390,14 +468,14 @@ function updateUnreadBadge() {
 function renderGrid() {
   const q = searchQuery.toLowerCase().trim();
   const tag = state.activeTag;
-  const source = tag === "STARRED" ? activeNoticesForTag("STARRED") : (state.feed[tag] || []);
+  const source = activeNoticesForTag(tag);
   const list = source.filter(n => !q || n.title.toLowerCase().includes(q)).filter(isInDateRange);
 
   if (!list.length) {
     let msg;
     if (tag === "STARRED") msg = "No starred notices yet — click ☆ on any card.";
     else if (source.length) msg = "No matches for your filter.";
-    else msg = "No notices yet — click Force crawl to load.";
+    else msg = streamActive ? "Loading…" : "No notices yet — click Force crawl to load.";
     gridEl.innerHTML = `<div class="empty">${escapeHtml(msg)}</div>`;
     return;
   }
@@ -408,9 +486,9 @@ function renderGrid() {
     const isStarred = userState.starredUrls.has(n.url);
     const kw = matchesKeywords(n.title);
     const cls = ["card"]; if (!isRead) cls.push("unread"); if (isStarred) cls.push("starred");
-    const sectionBadge = n.section ? `<span class="section-badge">${escapeHtml(n.section)}</span>` : "";
+    const sectionBadge = (tag === "ALL" && n.section) ? `<span class="section-badge">${escapeHtml(n.section)}</span>` : "";
     return `
-      <div class="${cls.join(" ")}" style="animation-delay:${Math.min(i * 25, 300)}ms">
+      <div class="${cls.join(" ")}" style="animation-delay:${Math.min(i * 15, 250)}ms">
         <button class="star-btn ${isStarred ? "on" : ""}" data-star="${escapeHtml(n.url)}">${isStarred ? "★" : "☆"}</button>
         <span class="serial">${i + 1}.</span>
         <a class="title" href="${n.url}" target="_blank" rel="noopener" data-read="${escapeHtml(n.url)}">
@@ -490,15 +568,18 @@ setInterval(() => {
 
   log(`✓ Endpoint: ${VERCEL_ENDPOINT}`);
 
+  // Start streaming fetch
   (async () => {
-    const data = await fetchFeed();
-    if (data) applyFeed(data, false);
-    else if (!state.updatedAt) setStatus("Vercel endpoint not responding — click Force crawl.", "err");
+    const ok = await fetchFeedStreaming();
+    if (!ok && !state.updatedAt) {
+      setStatus("Vercel endpoint not responding — click Force crawl.", "err");
+    }
   })();
 
+  // Periodic re-poll
   pollTimer = setInterval(async () => {
-    const data = await fetchFeed();
-    if (data) applyFeed(data, false);
+    if (streamActive) return;
+    await fetchFeedStreaming();
   }, POLL_MS);
 })();
 </script>
