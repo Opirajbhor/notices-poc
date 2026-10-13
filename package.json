@@ -1,0 +1,6 @@
+{
+  "type": "module",
+  "dependencies": {
+    "undici": "^6.19.0"
+  }
+}
