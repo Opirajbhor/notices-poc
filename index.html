@@ -54,11 +54,8 @@
   .tag.shed{background:#facc15}
   .tag.bteb{background:#a78bfa}
   .tag.techedu{background:#4ade80}
-  .tag.dhakaschool{background:#fb7185}
-  .tag.dhakacollege{background:#f97316}
-  .tag.dhakajsc{background:#22d3ee}
-  .tag.dhakassc{background:#a3e635}
-  .tag.dhakahsc{background:#e879f9}
+  .tag.dhaka{background:#fb7185}
+  .section-badge{font-size:10px;font-weight:600;color:var(--muted);padding:2px 6px;border:1px solid var(--border);border-radius:4px;flex-shrink:0}
   mark{background:#fde047;color:#0f172a;padding:0 2px;border-radius:2px}
   .spinner{display:inline-block;width:12px;height:12px;vertical-align:middle;margin-right:6px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
@@ -107,21 +104,17 @@
 
 <script>
 const VERCEL_ENDPOINT = "/api/notices";
-const POLL_MS = 5 * 60 * 1000;   // 5 min — 9 sites per poll
-const LOCAL_CACHE_KEY = "govt_notices_vercel_v2";
+const POLL_MS = 5 * 60 * 1000;
+const LOCAL_CACHE_KEY = "govt_notices_vercel_v3";
 const SETTINGS_KEY = "govt_notices_settings_v1";
 const USER_STATE_KEY = "govt_notices_userstate_v1";
 
 const SITES = [
-  { tag: "DSHE",          cls: "dshe" },
-  { tag: "SHED",          cls: "shed" },
-  { tag: "BTEB",          cls: "bteb" },
-  { tag: "TechEdu",       cls: "techedu" },
-  { tag: "Dhaka-School",  cls: "dhakaschool" },
-  { tag: "Dhaka-College", cls: "dhakacollege" },
-  { tag: "Dhaka-JSC",     cls: "dhakajsc" },
-  { tag: "Dhaka-SSC",     cls: "dhakassc" },
-  { tag: "Dhaka-HSC",     cls: "dhakahsc" },
+  { tag: "DSHE",    cls: "dshe" },
+  { tag: "SHED",    cls: "shed" },
+  { tag: "BTEB",    cls: "bteb" },
+  { tag: "TechEdu", cls: "techedu" },
+  { tag: "Dhaka",   cls: "dhaka" },
 ];
 
 const state = { activeTag: "SHED", feed: {}, updatedAt: null, lastCrawledAt: null };
@@ -281,8 +274,12 @@ async function fetchFeed() {
     log(`✓ Feed fetched in ${((Date.now() - t0)/1000).toFixed(2)}s · totalMs=${data.totalMs}ms`);
     if (data.meta) {
       for (const [tag, m] of Object.entries(data.meta)) {
-        const dedup = m.dedupedRemoved ? ` (deduped ${m.dedupedRemoved})` : "";
-        log(`  ${tag}: ${m.ok ? "✓" : "✗"} ${m.count}${dedup} in ${m.ms}ms${m.proxyUsed ? " via " + m.proxyUsed : ""}${m.error ? " — " + m.error : ""}`);
+        if (tag === "Dhaka" && m.sections) {
+          const parts = Object.entries(m.sections).map(([k, v]) => `${k}:${v.count}`).join(" ");
+          log(`  Dhaka: ${m.ok ? "✓" : "✗"} ${m.count} total [${parts}] in ${m.ms}ms`);
+        } else {
+          log(`  ${tag}: ${m.ok ? "✓" : "✗"} ${m.count} in ${m.ms}ms${m.proxyUsed ? " via " + m.proxyUsed : ""}${m.error ? " — " + m.error : ""}`);
+        }
       }
     }
     return data;
@@ -295,7 +292,7 @@ async function fetchFeed() {
 async function forceCrawl() {
   const btn = document.getElementById("forceRefresh");
   btn.disabled = true;
-  setStatus(`<span class="spinner"></span> Crawling 9 sites through BD proxies (~45s)…`);
+  setStatus(`<span class="spinner"></span> Crawling all sites through BD proxies (~50s)…`);
   log("════════ Force crawl ════════");
   const data = await fetchFeed();
   if (data) {
@@ -368,8 +365,9 @@ function renderTabs() {
     const isActive = state.activeTag === s.tag;
     const unread = unreadCountForTag(s.tag);
     const dot = unread > 0 ? 'style="display:inline-block"' : '';
+    const label = s.tag === "Dhaka" ? "Dhaka Board" : s.tag;
     return `<button class="tab ${isActive ? "active" : ""} ${unread ? "has-unread" : ""}" data-tag="${s.tag}">
-      ${s.tag} <span class="count">${arr.length}</span>
+      ${label} <span class="count">${arr.length}</span>
       <span class="unread-dot" ${dot}></span>
     </button>`;
   }).join("");
@@ -410,6 +408,7 @@ function renderGrid() {
     const isStarred = userState.starredUrls.has(n.url);
     const kw = matchesKeywords(n.title);
     const cls = ["card"]; if (!isRead) cls.push("unread"); if (isStarred) cls.push("starred");
+    const sectionBadge = n.section ? `<span class="section-badge">${escapeHtml(n.section)}</span>` : "";
     return `
       <div class="${cls.join(" ")}" style="animation-delay:${Math.min(i * 25, 300)}ms">
         <button class="star-btn ${isStarred ? "on" : ""}" data-star="${escapeHtml(n.url)}">${isStarred ? "★" : "☆"}</button>
@@ -418,7 +417,8 @@ function renderGrid() {
           ${highlightTitle(n.title)}${kw ? ' <span style="color:#fbbf24;font-size:11px">●</span>' : ''}
         </a>
         ${stamp ? `<span class="date">${escapeHtml(stamp)}</span>` : ""}
-        <span class="tag ${n.cls || ""}">${n.tag}</span>
+        ${sectionBadge}
+        <span class="tag ${n.cls || ""}">${n.tag === "Dhaka" ? "DHAKA" : n.tag}</span>
       </div>
     `;
   }).join("");
