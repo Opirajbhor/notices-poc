@@ -1,5 +1,6 @@
 // ============================================================
-// BD govt notices fetcher — all sites share the full proxy pool
+// BD govt notices fetcher — sites processed sequentially
+// so free proxies aren't overwhelmed by concurrent load.
 // ============================================================
 
 import { ProxyAgent, fetch as undiciFetch } from 'undici';
@@ -38,13 +39,22 @@ export default async function handler(req, res) {
   if (!proxies.length) return res.status(500).json({ error: 'No BD proxies available right now' });
 
   // ---------------------------------------------------------
-  // All sites run in parallel, each with the FULL proxy pool.
-  // Free proxies handle concurrent requests fine; the "winner"
-  // for one site is usually also the winner for the others.
+  // Sequential: one site at a time, each with the FULL pool.
+  // Free BD proxies typically allow only 1–3 concurrent
+  // connections, so parallel requests to the same proxy all
+  // get dropped. Sequential avoids that.
   // ---------------------------------------------------------
-  const results = await Promise.all(
-    targets.map(site => fetchSiteViaProxy(site, proxies))
-  );
+  const results = [];
+  for (let i = 0; i < targets.length; i++) {
+    const site = targets[i];
+    const r = await fetchSiteViaProxy(site, proxies);
+    results.push(r);
+
+    // Small gap between sites so the pool cools down
+    if (i < targets.length - 1) {
+      await sleep(1000);
+    }
+  }
 
   const payload = {
     sites: {},
@@ -74,8 +84,7 @@ export default async function handler(req, res) {
 
 // ============================================================
 // Race through proxies — first success wins. If all fail,
-// do ONE retry pass with a reshuffled pool (many failures
-// are transient — a proxy that timed out once often works next).
+// retry once with a reshuffled pool.
 // ============================================================
 async function fetchSiteViaProxy(site, proxyList) {
   const t0 = Date.now();
@@ -100,8 +109,7 @@ async function fetchSiteViaProxy(site, proxyList) {
     } catch (e) {
       totalAttempts += shuffled.length;
       if (pass === 0) {
-        // Short pause then retry once with a fresh shuffle
-        await new Promise(r => setTimeout(r, 800));
+        await sleep(800);
         continue;
       }
       return {
@@ -196,6 +204,8 @@ function shuffle(arr) {
   return arr;
 }
 
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
 // ============================================================
 // Fetch the current list of BD HTTP proxies
 // ============================================================
@@ -218,9 +228,6 @@ async function fetchBdProxies() {
     } catch {}
   }
 
-  // If our second source includes non-BD proxies, filter geographically
-  // by testing only the first batch that responds quickly. For simplicity
-  // here, we keep everything and let the race handle unreliability.
   return [...all];
 }
 
