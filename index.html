@@ -4,120 +4,602 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Govt Notices</title>
+<link rel="icon" href="https://img.icons8.com/fluency/48/break.png">
 <style>
-  :root{--bg:#0f172a;--card:#1e293b;--border:#334155;--text:#e2e8f0;--muted:#94a3b8;--accent:#38bdf8;--star:#fbbf24;--unread:#ef4444}
-  *{box-sizing:border-box}
-  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text)}
-  header{padding:20px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-  h1{font-size:18px;margin:0;flex:1;display:flex;align-items:center;gap:8px}
-  h1 .badge{background:var(--unread);color:#fff;font-size:12px;padding:2px 8px;border-radius:999px;font-weight:700;display:none}
-  h1 .badge.show{display:inline-block}
-  button{background:var(--accent);color:#0f172a;border:0;padding:8px 14px;border-radius:6px;font-weight:600;cursor:pointer;font-family:inherit;font-size:13px}
-  button:disabled{opacity:.5;cursor:wait}
-  button.secondary{background:transparent;color:var(--text);border:1px solid var(--border)}
-  button.secondary.active{background:var(--accent);color:#0f172a;border-color:var(--accent)}
-  .updated{color:var(--muted);font-size:12px;padding:0 20px 8px}
-  .controls{padding:12px 20px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-  .controls.second{padding-top:0}
-  input,select{background:var(--card);color:var(--text);border:1px solid var(--border);padding:8px 10px;border-radius:6px;font-size:14px;font-family:inherit}
-  input{flex:1;min-width:200px}
-  select{cursor:pointer}
-  .tabs{display:flex;gap:8px;flex-wrap:wrap}
-  .tab{background:transparent;color:var(--muted);border:1px solid var(--border);padding:6px 12px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px;transition:.15s;position:relative}
-  .tab:hover{color:var(--text);border-color:var(--accent)}
-  .tab.active{background:var(--accent);color:#0f172a;border-color:var(--accent)}
-  .tab.all-tab{color:#e2e8f0}
-  .tab.all-tab.active{background:#818cf8;color:#0f172a;border-color:#818cf8}
-  .tab.starred-tab{color:var(--star)}
-  .tab.starred-tab.active{background:var(--star);color:#0f172a;border-color:var(--star)}
-  .tab .count{background:rgba(15,23,42,.35);color:inherit;font-size:11px;padding:1px 6px;border-radius:999px;font-variant-numeric:tabular-nums}
-  .tab:not(.active) .count{background:var(--border);color:var(--text)}
-  .tab .unread-dot{width:8px;height:8px;border-radius:50%;background:var(--unread);display:none}
-  .tab.has-unread .unread-dot{display:inline-block}
-  .tab.loading .count::after{content:"…";margin-left:2px}
-  .status{padding:0 20px 10px;color:var(--muted);font-size:13px;min-height:18px}
-  .status .err{color:#f87171}
-  .status .ok{color:#4ade80}
-  .status .warn{color:#facc15}
-  .grid{padding:0 20px 40px;display:grid;gap:10px}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;animation:fadeIn .35s ease-out both;position:relative}
-  .card.unread{border-left:3px solid var(--unread)}
-  .card.starred{border-left:3px solid var(--star)}
-  @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-  .star-btn{background:transparent;border:0;padding:4px;cursor:pointer;color:var(--muted);font-size:16px;line-height:1;flex-shrink:0;transition:.15s}
-  .star-btn:hover{color:var(--star);transform:scale(1.15)}
-  .star-btn.on{color:var(--star)}
-  .serial{color:var(--muted);font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;flex-shrink:0;min-width:22px}
-  .title{color:#f8fafc;text-decoration:none;font-size:15px;font-weight:500;line-height:1.45;flex:1 1 260px;min-width:0;word-break:break-word}
-  .title:hover{color:var(--accent)}
-  .card.unread .title{font-weight:600}
-  .date{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums;flex-shrink:0}
-  .tag{font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;text-transform:uppercase;flex-shrink:0;color:#0f172a;white-space:nowrap}
-  .tag.dshe{background:#38bdf8}
-  .tag.shed{background:#facc15}
-  .tag.bteb{background:#a78bfa}
-  .tag.techedu{background:#4ade80}
-  .tag.dhaka{background:#fb7185}
-  .section-badge{font-size:10px;font-weight:600;color:var(--muted);padding:2px 6px;border:1px solid var(--border);border-radius:4px;flex-shrink:0}
-  mark{background:#fde047;color:#0f172a;padding:0 2px;border-radius:2px}
-  .spinner{display:inline-block;width:12px;height:12px;vertical-align:middle;margin-right:6px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
-  @keyframes spin{to{transform:rotate(360deg)}}
-  .empty{color:var(--muted);padding:40px;text-align:center}
-  .streaming-bar{position:sticky;top:0;z-index:10;background:linear-gradient(180deg,var(--bg) 80%,transparent);padding:8px 20px;display:none}
-  .streaming-bar.show{display:block}
-  .streaming-bar .msg{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--accent);background:var(--card);border:1px solid var(--border);padding:6px 12px;border-radius:999px}
-  details{margin:0 20px 12px;color:var(--muted);font-size:12px;background:var(--card);border:1px solid var(--border);border-radius:8px}
-  details summary{padding:10px 14px;cursor:pointer;font-weight:600;user-select:none;list-style:none}
-  details summary::-webkit-details-marker{display:none}
-  details summary::before{content:"▸ ";display:inline-block;transition:transform .15s}
-  details[open] summary::before{transform:rotate(90deg)}
-  details pre{margin:0 14px 12px;background:#0b1220;padding:10px;border-radius:6px;overflow:auto;max-height:260px;white-space:pre-wrap;word-break:break-word;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;line-height:1.55;color:#cbd5e1}
+  :root {
+    --bg: #0a0f1e;
+    --bg-soft: #0f1628;
+    --card: #141b2e;
+    --card-hover: #1a2338;
+    --border: #1f2a44;
+    --border-soft: #172035;
+    --text: #e8edf5;
+    --text-dim: #a0adc2;
+    --muted: #6b7a94;
+    --accent: #38bdf8;
+    --accent-hover: #7dd3fc;
+    --star: #fbbf24;
+    --unread: #ef4444;
+    --success: #22c55e;
+
+    --tag-dshe: #38bdf8;
+    --tag-shed: #f59e0b;
+    --tag-bteb: #a855f7;
+    --tag-techedu: #10b981;
+    --tag-dhaka: #f43f5e;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* ================= Header ================= */
+  header {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    background: var(--bg-soft);
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
+  }
+  .logo {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    flex-shrink: 0;
+  }
+  .brand h1 {
+    font-size: 17px;
+    font-weight: 700;
+    margin: 0;
+    letter-spacing: -0.01em;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .brand .unread-badge {
+    background: var(--unread);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 999px;
+    display: none;
+    min-width: 20px;
+    text-align: center;
+  }
+  .brand .unread-badge.show { display: inline-block; }
+
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-dim);
+    font-size: 13px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .btn:hover {
+    background: var(--card);
+    color: var(--text);
+    border-color: var(--accent);
+  }
+  .btn:disabled { opacity: 0.5; cursor: wait; }
+  .btn.active {
+    background: var(--accent);
+    color: var(--bg);
+    border-color: var(--accent);
+  }
+  .btn svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  /* ================= Meta bar ================= */
+  .meta-bar {
+    padding: 10px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 12.5px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border-soft);
+    flex-wrap: wrap;
+  }
+  .meta-bar .dot-sep { color: var(--border); }
+  .meta-bar .progress-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--accent);
+    font-weight: 500;
+  }
+  .progress-track {
+    width: 100px;
+    height: 4px;
+    background: var(--border);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent-hover));
+    border-radius: 999px;
+    transition: width 0.3s ease;
+  }
+  .progress-wrap.hidden { display: none; }
+
+  /* ================= Search + Tabs ================= */
+  .controls {
+    padding: 16px 24px 12px;
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .search-wrap {
+    position: relative;
+    flex: 1;
+    min-width: 240px;
+  }
+  .search-wrap svg {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 16px;
+    height: 16px;
+    stroke: var(--muted);
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    pointer-events: none;
+  }
+  .search-wrap input {
+    width: 100%;
+    padding: 10px 12px 10px 36px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-size: 14px;
+    font-family: inherit;
+    transition: all 0.15s ease;
+  }
+  .search-wrap input:focus {
+    outline: none;
+    border-color: var(--accent);
+    background: var(--card-hover);
+  }
+  .search-wrap input::placeholder { color: var(--muted); }
+
+  .tabs {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    width: 100%;
+    padding-top: 4px;
+  }
+  .tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-dim);
+    font-size: 13px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+  }
+  .tab:hover {
+    color: var(--text);
+    border-color: var(--accent);
+    background: var(--card);
+  }
+  .tab.active {
+    background: var(--accent);
+    color: var(--bg);
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+  .tab.all-tab.active { background: #818cf8; border-color: #818cf8; }
+  .tab.starred-tab { color: var(--star); }
+  .tab.starred-tab.active { background: var(--star); color: var(--bg); border-color: var(--star); }
+  .tab .count {
+    font-size: 11px;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    font-variant-numeric: tabular-nums;
+    min-width: 20px;
+    text-align: center;
+  }
+  .tab.active .count { background: rgba(0, 0, 0, 0.18); }
+  .tab .unread-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--unread);
+    flex-shrink: 0;
+    display: none;
+  }
+  .tab.has-unread .unread-dot { display: inline-block; }
+  .tab.loading .count::after { content: "…"; }
+
+  /* ================= Filters ================= */
+  .filters {
+    padding: 0 24px 12px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .filters select,
+  .filters input {
+    padding: 8px 12px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 13px;
+    font-family: inherit;
+    transition: border-color 0.15s;
+  }
+  .filters select:focus,
+  .filters input:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  .filters select { cursor: pointer; }
+  .filters input { flex: 1; min-width: 220px; }
+  .filters input::placeholder { color: var(--muted); }
+
+  /* ================= Status message ================= */
+  .status {
+    padding: 0 24px 12px;
+    font-size: 12.5px;
+    color: var(--muted);
+    min-height: 18px;
+  }
+  .status.ok { color: var(--success); }
+  .status.err { color: var(--unread); }
+  .status.warn { color: var(--star); }
+
+  /* ================= Grid ================= */
+  .grid {
+    padding: 0 24px 48px;
+    display: grid;
+    gap: 8px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    transition: all 0.15s ease;
+    animation: fadeIn 0.3s ease-out both;
+    position: relative;
+  }
+  .card:hover {
+    background: var(--card-hover);
+    border-color: var(--border);
+  }
+  .card.unread { border-left: 3px solid var(--unread); }
+  .card.starred { border-left: 3px solid var(--star); }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: none; }
+  }
+
+  .star-btn {
+    background: transparent;
+    border: none;
+    padding: 4px;
+    cursor: pointer;
+    color: var(--muted);
+    font-size: 17px;
+    line-height: 1;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+    border-radius: 6px;
+  }
+  .star-btn:hover { color: var(--star); background: rgba(251, 191, 36, 0.1); transform: scale(1.1); }
+  .star-btn.on { color: var(--star); }
+
+  .serial {
+    color: var(--muted);
+    font-size: 12.5px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+    min-width: 24px;
+  }
+
+  .title {
+    color: var(--text);
+    text-decoration: none;
+    font-size: 14.5px;
+    font-weight: 500;
+    line-height: 1.5;
+    flex: 1 1 300px;
+    min-width: 0;
+    word-break: break-word;
+    transition: color 0.15s;
+  }
+  .title:hover { color: var(--accent); }
+  .card.unread .title { font-weight: 600; color: #f8fafc; }
+
+  .date {
+    color: var(--muted);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+    padding: 3px 8px;
+    background: var(--bg-soft);
+    border-radius: 6px;
+    border: 1px solid var(--border-soft);
+  }
+
+  .section-badge {
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--text-dim);
+    padding: 3px 8px;
+    background: var(--bg-soft);
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    flex-shrink: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .tag {
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    flex-shrink: 0;
+    color: #0a0f1e;
+    white-space: nowrap;
+  }
+  .tag.dshe    { background: var(--tag-dshe); }
+  .tag.shed    { background: var(--tag-shed); }
+  .tag.bteb    { background: var(--tag-bteb); }
+  .tag.techedu { background: var(--tag-techedu); }
+  .tag.dhaka   { background: var(--tag-dhaka); }
+
+  mark {
+    background: #fde047;
+    color: var(--bg);
+    padding: 0 2px;
+    border-radius: 3px;
+    font-weight: 600;
+  }
+
+  /* ================= Skeleton loading ================= */
+  .skeleton-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    overflow: hidden;
+  }
+  .sk {
+    height: 12px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, var(--border-soft) 0%, var(--border) 50%, var(--border-soft) 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s infinite linear;
+    flex-shrink: 0;
+  }
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+  .sk.star { width: 20px; height: 20px; border-radius: 50%; }
+  .sk.serial { width: 24px; }
+  .sk.title { flex: 1; min-width: 200px; }
+  .sk.date { width: 70px; }
+  .sk.tag { width: 60px; height: 20px; border-radius: 6px; }
+
+  /* ================= Spinner ================= */
+  .spinner {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ================= Empty state ================= */
+  .empty {
+    padding: 60px 24px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 14px;
+  }
+  .empty-icon {
+    font-size: 40px;
+    margin-bottom: 12px;
+    opacity: 0.5;
+  }
+  .empty strong {
+    display: block;
+    color: var(--text-dim);
+    font-size: 15px;
+    margin-bottom: 4px;
+    font-weight: 600;
+  }
+
+  /* ================= Debug ================= */
+  details.debug {
+    margin: 0 24px 16px;
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  details.debug summary {
+    padding: 12px 16px;
+    cursor: pointer;
+    font-weight: 600;
+    user-select: none;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  details.debug summary::-webkit-details-marker { display: none; }
+  details.debug summary::before {
+    content: "▸";
+    display: inline-block;
+    transition: transform 0.15s;
+    color: var(--accent);
+  }
+  details.debug[open] summary::before { transform: rotate(90deg); }
+  details.debug pre {
+    margin: 0 16px 14px;
+    background: #060a14;
+    padding: 12px;
+    border-radius: 8px;
+    overflow: auto;
+    max-height: 240px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 11.5px;
+    line-height: 1.6;
+    color: #cbd5e1;
+  }
 </style>
 </head>
 <body>
 
 <header>
-  <h1>📢 Govt Notices <span class="badge" id="unreadBadge">0</span></h1>
-  <button id="notifBtn" class="secondary">🔔 Enable alerts</button>
-  <button id="forceRefresh" class="secondary">Force crawl</button>
-  <button id="clear" class="secondary">Clear local cache</button>
+  <div class="brand">
+    <img class="logo" src="https://img.icons8.com/fluency/48/break.png" alt="">
+    <h1>Govt Notices <span class="unread-badge" id="unreadBadge">0</span></h1>
+  </div>
+  <div class="actions">
+    <button class="btn" id="notifBtn" title="Enable browser notifications">
+      <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      <span>Alerts</span>
+    </button>
+    <button class="btn" id="forceRefresh" title="Refresh all sources now">
+      <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+      <span>Refresh</span>
+    </button>
+    <button class="btn" id="clear" title="Clear local cache">
+      <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+      <span>Clear</span>
+    </button>
+  </div>
 </header>
 
-<div class="updated" id="updated"></div>
-
-<div class="streaming-bar" id="streamingBar">
-  <span class="msg"><span class="spinner"></span><span id="streamingText">Fetching…</span></span>
+<div class="meta-bar">
+  <span id="updated">Waiting for first crawl…</span>
+  <span class="dot-sep" id="sep1" style="display:none">•</span>
+  <span class="progress-wrap hidden" id="progressWrap">
+    <span id="progressLabel">Loading…</span>
+    <div class="progress-track"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </span>
 </div>
 
-<details>
+<details class="debug">
   <summary>Debug log</summary>
   <pre id="log"></pre>
 </details>
 
 <div class="controls">
-  <input id="search" placeholder="Search title...">
+  <div class="search-wrap">
+    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input id="search" type="search" placeholder="Search notices by title…">
+  </div>
   <div class="tabs" id="tabs"></div>
 </div>
 
-<div class="controls second">
+<div class="filters">
   <select id="dateFilter">
     <option value="all">All dates</option>
     <option value="day">Today</option>
     <option value="week">This week</option>
     <option value="month">This month</option>
   </select>
-  <input id="keywords" placeholder="Alert keywords (comma-separated, e.g. পরীক্ষা, ছুটি)">
+  <input id="keywords" placeholder="Keyword alerts (comma-separated, e.g. পরীক্ষা, ছুটি)">
 </div>
 
 <div class="status" id="status"></div>
 <div class="grid" id="grid"></div>
 
 <script>
+// ============================================================
+// CONFIG
+// ============================================================
 const VERCEL_ENDPOINT = "/api/notices";
 const POLL_MS = 5 * 60 * 1000;
-const LOCAL_CACHE_KEY = "govt_notices_vercel_v5";
+const LOCAL_CACHE_KEY = "govt_notices_vercel_v6";
 const SETTINGS_KEY = "govt_notices_settings_v1";
 const USER_STATE_KEY = "govt_notices_userstate_v1";
+const TOTAL_SOURCES = 9;
 
 const SITES = [
   { tag: "DSHE",    cls: "dshe" },
@@ -127,60 +609,94 @@ const SITES = [
   { tag: "Dhaka",   cls: "dhaka" },
 ];
 
-// Default = ALL
-const state = { activeTag: "ALL", feed: {}, updatedAt: null, lastCrawledAt: null };
+// ─── DEFAULT TAB ───
+const state = {
+  activeTag: "ALL",
+  feed: {},
+  updatedAt: null,
+  lastCrawledAt: null,
+  streamActive: false,
+  streamLoaded: 0,
+  siteLoaded: {},
+};
 const settings = { keywords: [], dateFilter: "all", notificationsEnabled: false };
 const userState = { seenUrls: new Set(), readUrls: new Set(), starredUrls: new Set() };
 
 let searchQuery = "";
 let pollTimer = null;
-let streamActive = false;
 
-const gridEl = document.getElementById("grid");
-const statusEl = document.getElementById("status");
-const tabsEl = document.getElementById("tabs");
-const searchEl = document.getElementById("search");
-const logEl = document.getElementById("log");
-const notifBtn = document.getElementById("notifBtn");
+// ============================================================
+// DOM
+// ============================================================
+const gridEl      = document.getElementById("grid");
+const statusEl    = document.getElementById("status");
+const tabsEl      = document.getElementById("tabs");
+const searchEl    = document.getElementById("search");
+const logEl       = document.getElementById("log");
+const notifBtn    = document.getElementById("notifBtn");
 const unreadBadge = document.getElementById("unreadBadge");
-const dateFilterEl = document.getElementById("dateFilter");
-const keywordsEl = document.getElementById("keywords");
-const updatedEl = document.getElementById("updated");
-const streamingBar = document.getElementById("streamingBar");
-const streamingText = document.getElementById("streamingText");
+const dateFilterEl= document.getElementById("dateFilter");
+const keywordsEl  = document.getElementById("keywords");
+const updatedEl   = document.getElementById("updated");
+const progressWrap= document.getElementById("progressWrap");
+const progressLabel=document.getElementById("progressLabel");
+const progressFill= document.getElementById("progressFill");
 
+// ============================================================
+// HELPERS
+// ============================================================
 function log(msg) {
   console.log(msg);
   logEl.textContent += `[${new Date().toLocaleTimeString()}] ${msg}\n`;
   logEl.scrollTop = logEl.scrollHeight;
 }
 function setStatus(html, type = "") {
-  statusEl.innerHTML = type ? `<span class="${type}">${html}</span>` : html;
+  statusEl.innerHTML = html;
+  statusEl.className = "status" + (type ? " " + type : "");
 }
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const BN_DIGITS = {"০":"0","১":"1","২":"2","৩":"3","৪":"4","৫":"5","৬":"6","৭":"7","৮":"8","৯":"9"};
-function bnToEn(s) { return String(s).replace(/[০-৯]/g, d => BN_DIGITS[d]); }
+
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 }
+const BN_DIGITS = {"০":"0","১":"1","২":"2","৩":"3","৪":"4","৫":"5","৬":"6","৭":"7","৮":"8","৯":"9"};
+function bnToEn(s) { return String(s).replace(/[০-৯]/g, d => BN_DIGITS[d]); }
+
 const MONTHS = { jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11 };
-function parseDateForFilter(d) {
+
+// ── FIXED: correctly handles MM/DD/YYYY from DSHE/SHED/BTEB/TechEdu
+// and DD Mon YYYY from Dhaka. Prevents "latest on top" from breaking.
+function parseAnyDate(d) {
   if (!d) return null;
   const s = bnToEn(String(d)).trim();
+
+  // YYYY-MM-DD
   let m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (m) return new Date(+m[1], +m[2]-1, +m[3]);
-  m = s.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})$/);
-  if (m) { let y = +m[3]; if (y < 100) y += 2000; return new Date(y, +m[2]-1, +m[1]); }
+
+  // DD Mon YYYY (e.g. "07 Oct 2026")
   m = s.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/);
   if (m) {
     const mon = MONTHS[m[2].toLowerCase().slice(0, 3)];
     if (mon !== undefined) return new Date(+m[3], mon, +m[1]);
   }
+
+  // N/M/YYYY — resolve ambiguity
+  m = s.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})$/);
+  if (m) {
+    let n = +m[1], m2 = +m[2], y = +m[3];
+    if (y < 100) y += 2000;
+    if (n < 1 || m2 < 1) return null;
+    if (n > 12 && m2 <= 12) return new Date(y, m2 - 1, n); // must be DD/MM
+    if (m2 > 12 && n <= 12) return new Date(y, n - 1, m2); // must be MM/DD
+    return new Date(y, n - 1, m2);                          // ambiguous → assume MM/DD (govt source format)
+  }
   return null;
 }
+
 function isInDateRange(n) {
   if (settings.dateFilter === "all") return true;
-  const d = parseDateForFilter(n.date);
+  const d = parseAnyDate(n.date);
   if (!d) return false;
   const now = new Date();
   const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -189,6 +705,7 @@ function isInDateRange(n) {
   if (settings.dateFilter === "month") return d >= new Date(now.getFullYear(), now.getMonth(), 1);
   return true;
 }
+
 function matchesKeywords(title) {
   if (!settings.keywords.length) return false;
   const lower = title.toLowerCase();
@@ -213,6 +730,9 @@ function relativeTime(iso) {
   return `${Math.floor(diff/86400)}d ago`;
 }
 
+// ============================================================
+// PERSISTENCE
+// ============================================================
 function saveSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch {} }
 function loadSettings() {
   try {
@@ -223,9 +743,11 @@ function loadSettings() {
   } catch {}
 }
 function saveUserState() {
-  try { localStorage.setItem(USER_STATE_KEY, JSON.stringify({
-    seenUrls: [...userState.seenUrls], readUrls: [...userState.readUrls], starredUrls: [...userState.starredUrls]
-  })); } catch {}
+  try {
+    localStorage.setItem(USER_STATE_KEY, JSON.stringify({
+      seenUrls: [...userState.seenUrls], readUrls: [...userState.readUrls], starredUrls: [...userState.starredUrls]
+    }));
+  } catch {}
 }
 function loadUserState() {
   try {
@@ -244,19 +766,31 @@ function loadLocalFeed() {
   try {
     const o = JSON.parse(localStorage.getItem(LOCAL_CACHE_KEY) || "null");
     if (o && o.feed) {
-      state.feed = o.feed; state.updatedAt = o.updatedAt; state.lastCrawledAt = o.lastCrawledAt;
+      state.feed = o.feed;
+      state.updatedAt = o.updatedAt;
+      state.lastCrawledAt = o.lastCrawledAt;
+      SITES.forEach(s => { if (state.feed[s.tag]?.length) state.siteLoaded[s.tag] = true; });
       return true;
     }
   } catch {}
   return false;
 }
 
+// ============================================================
+// NOTIFICATIONS
+// ============================================================
 function updateNotifBtn() {
-  if (!("Notification" in window)) { notifBtn.textContent = "🔕 Not supported"; notifBtn.disabled = true; return; }
+  if (!("Notification" in window)) {
+    notifBtn.disabled = true;
+    notifBtn.querySelector("span").textContent = "Not supported";
+    return;
+  }
   if (Notification.permission === "granted" && settings.notificationsEnabled) {
-    notifBtn.textContent = "🔔 Alerts on"; notifBtn.classList.add("active");
+    notifBtn.classList.add("active");
+    notifBtn.querySelector("span").textContent = "Alerts on";
   } else {
-    notifBtn.textContent = "🔔 Enable alerts"; notifBtn.classList.remove("active");
+    notifBtn.classList.remove("active");
+    notifBtn.querySelector("span").textContent = "Alerts";
   }
 }
 notifBtn.addEventListener("click", async () => {
@@ -268,8 +802,8 @@ notifBtn.addEventListener("click", async () => {
   const p = await Notification.requestPermission();
   if (p === "granted") {
     settings.notificationsEnabled = true; saveSettings(); updateNotifBtn();
-    setStatus("Alerts enabled.", "ok");
-  } else setStatus("Permission denied.", "err");
+    setStatus("Alerts enabled — you'll be notified of new notices.", "ok");
+  } else setStatus("Notification permission denied.", "err");
 });
 function fireNotification(title, body, url) {
   if (!("Notification" in window) || Notification.permission !== "granted" || !settings.notificationsEnabled) return;
@@ -280,65 +814,73 @@ function fireNotification(title, body, url) {
 }
 
 // ============================================================
-// Streaming fetch — reads NDJSON line-by-line and renders
-// each site as soon as its chunk arrives.
+// STREAMING FETCH
 // ============================================================
 async function fetchFeedStreaming() {
-  const t0 = Date.now();
-  streamActive = true;
-  streamingBar.classList.add("show");
-  streamingText.textContent = "Starting crawl…";
-  log("════════ Streaming crawl ════════");
+  streamActive();
+  log("════════ Streaming crawl started ════════");
+  progressWrap.classList.remove("hidden");
+  progressFill.style.width = "0%";
+  progressLabel.textContent = "Loading 0 / " + TOTAL_SOURCES + " sources…";
 
   let res;
   try {
     res = await fetch(VERCEL_ENDPOINT, { headers: { 'Accept': 'application/x-ndjson' } });
   } catch (e) {
     log(`✗ fetch error: ${e.message}`);
-    streamActive = false;
-    streamingBar.classList.remove("show");
+    streamDone();
     return false;
   }
   if (!res.ok || !res.body) {
     log(`✗ HTTP ${res.status} — no stream body`);
-    streamActive = false;
-    streamingBar.classList.remove('show');
+    streamDone();
     return false;
   }
 
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
-  let buffer = '';
-  let siteCount = 0;
+  let buffer = "";
 
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split('\n');
+    const lines = buffer.split("\n");
     buffer = lines.pop();
     for (const line of lines) {
       if (!line.trim()) continue;
       let msg;
       try { msg = JSON.parse(line); } catch { continue; }
-      if (msg.type === 'start') {
-        log(`↻ Stream started (proxies: ${msg.proxyPoolSize})`);
-      } else if (msg.type === 'site') {
-        siteCount++;
+      if (msg.type === "site") {
+        state.streamLoaded++;
+        const pct = Math.round((state.streamLoaded / TOTAL_SOURCES) * 100);
+        progressFill.style.width = pct + "%";
+        progressLabel.textContent = `Loading ${state.streamLoaded} / ${TOTAL_SOURCES} sources…`;
         onSiteArrived(msg);
-      } else if (msg.type === 'done') {
+      } else if (msg.type === "done") {
         log(`✓ Stream done in ${(msg.totalMs / 1000).toFixed(1)}s`);
-      } else if (msg.type === 'error') {
+      } else if (msg.type === "error") {
         log(`✗ Stream error: ${msg.error}`);
       }
     }
   }
 
-  streamActive = false;
-  streamingBar.classList.remove('show');
+  streamDone();
   const total = SITES.reduce((s, x) => s + (state.feed[x.tag]?.length || 0), 0);
-  setStatus(`All done · ${total} notices · updated ${relativeTime(state.updatedAt)}`, "ok");
+  setStatus(`All sources loaded · ${total} notices · updated ${relativeTime(state.updatedAt)}`, "ok");
   return true;
+}
+
+function streamActive() {
+  state.streamActive = true;
+  state.streamLoaded = 0;
+  state.siteLoaded = {};
+  renderAll();
+}
+function streamDone() {
+  state.streamActive = false;
+  progressWrap.classList.add("hidden");
+  renderAll();
 }
 
 function onSiteArrived(msg) {
@@ -351,8 +893,9 @@ function onSiteArrived(msg) {
   state.feed[tag] = [...existing, ...additions];
   state.updatedAt = new Date().toISOString();
   state.lastCrawledAt = state.updatedAt;
+  state.siteLoaded[tag] = true;
 
-  // Detect truly new notices since last session (for notifications)
+  // Detect genuinely new notices since last session
   const hadPrior = userState.seenUrls.size > 0;
   const brandNew = [];
   for (const n of additions) {
@@ -361,50 +904,44 @@ function onSiteArrived(msg) {
       brandNew.push(n);
     }
   }
-
   if (hadPrior && brandNew.length && settings.notificationsEnabled) {
     const kwNew = brandNew.filter(n => matchesKeywords(n.title));
     if (kwNew.length) {
-      fireNotification(`🔔 ${kwNew.length} keyword match${kwNew.length > 1 ? "es" : ""}`,
-        kwNew.slice(0, 3).map(n => n.title.slice(0, 80)).join("\n"), kwNew[0].url);
+      fireNotification(
+        `🔔 ${kwNew.length} keyword match${kwNew.length > 1 ? "es" : ""}`,
+        kwNew.slice(0, 3).map(n => n.title.slice(0, 80)).join("\n"),
+        kwNew[0].url
+      );
     }
   }
 
   saveLocalFeed();
   saveUserState();
-
-  // Render immediately — this is where the "instant" feel comes from
   renderAll();
 
-  if (msg.ok) {
-    log(`  ✓ ${tag}${msg.section ? "/" + msg.section : ""}: ${incoming.length} in ${msg.ms}ms`);
-    streamingText.textContent = `Loaded ${tag}${msg.section ? " (" + msg.section + ")" : ""} — ${additions.length} new`;
-  } else {
-    log(`  ✗ ${tag}: ${msg.error || "no data"}`);
-  }
-  setStatus(`Loaded ${tag} — showing ${state.feed[state.activeTag]?.length || 0} in current tab.`, "ok");
+  log(`  ✓ ${tag}${msg.section ? "/" + msg.section : ""}: ${additions.length} new (${msg.ms}ms)`);
 }
 
 async function forceCrawl() {
   const btn = document.getElementById("forceRefresh");
   btn.disabled = true;
-  streamingBar.classList.add("show");
-  streamingText.textContent = "Starting…";
   const ok = await fetchFeedStreaming();
   if (!ok) setStatus("Crawl failed — see debug log.", "err");
   btn.disabled = false;
 }
 
-// ------------------------------------------------------------
-// Aggregation and rendering
-// ------------------------------------------------------------
+// ============================================================
+// AGGREGATION & SORTING
+// ============================================================
 function allNotices() {
   const all = [];
   for (const s of SITES) all.push(...(state.feed[s.tag] || []));
+  // FIXED: sort by parsed date DESC (newest first), fallback to URL for stable tiebreaking
   all.sort((a, b) => {
-    const da = parseDateForFilter(a.date) || new Date(0);
-    const db = parseDateForFilter(b.date) || new Date(0);
-    return db - da;
+    const da = parseAnyDate(a.date)?.getTime() ?? 0;
+    const db = parseAnyDate(b.date)?.getTime() ?? 0;
+    if (db !== da) return db - da;
+    return (a.url || "").localeCompare(b.url || "");
   });
   return all;
 }
@@ -418,6 +955,9 @@ function unreadCountForTag(tag) {
   return activeNoticesForTag(tag).filter(n => !userState.readUrls.has(n.url)).length;
 }
 
+// ============================================================
+// RENDERING
+// ============================================================
 function renderTabs() {
   const allCount = allNotices().length;
   const allUnread = unreadCountForTag("ALL");
@@ -427,25 +967,31 @@ function renderTabs() {
   const starredUnread = unreadCountForTag("STARRED");
   const starredActive = state.activeTag === "STARRED";
 
-  const allTab = `<button class="tab all-tab ${allActive ? "active" : ""}" data-tag="ALL">
-    All <span class="count">${allCount}</span>
-    <span class="unread-dot" style="${allUnread ? 'display:inline-block' : ''}"></span>
+  const allLoading = state.streamActive && allCount === 0;
+
+  const allTab = `<button class="tab all-tab ${allActive ? "active" : ""} ${allLoading ? "loading" : ""} ${allUnread ? "has-unread" : ""}" data-tag="ALL">
+    All <span class="count">${allLoading ? "" : allCount}</span>
+    <span class="unread-dot"></span>
   </button>`;
 
-  const starredTab = `<button class="tab starred-tab ${starredActive ? "active" : ""}" data-tag="STARRED">
+  const starredTab = `<button class="tab starred-tab ${starredActive ? "active" : ""} ${starredUnread ? "has-unread" : ""}" data-tag="STARRED">
     ★ Starred <span class="count">${starredCount}</span>
-    <span class="unread-dot" style="${starredUnread ? 'display:inline-block' : ''}"></span>
+    <span class="unread-dot"></span>
   </button>`;
 
   const sites = SITES.map(s => {
     const arr = state.feed[s.tag] || [];
     const isActive = state.activeTag === s.tag;
     const unread = unreadCountForTag(s.tag);
-    const dot = unread > 0 ? 'style="display:inline-block"' : '';
+    const isLoading = state.streamActive && !state.siteLoaded[s.tag];
     const label = s.tag === "Dhaka" ? "Dhaka Board" : s.tag;
-    return `<button class="tab ${isActive ? "active" : ""} ${unread ? "has-unread" : ""}" data-tag="${s.tag}">
-      ${label} <span class="count">${arr.length}</span>
-      <span class="unread-dot" ${dot}></span>
+    const classes = ["tab"];
+    if (isActive) classes.push("active");
+    if (unread) classes.push("has-unread");
+    if (isLoading) classes.push("loading");
+    return `<button class="${classes.join(" ")}" data-tag="${s.tag}">
+      ${label} <span class="count">${isLoading ? "" : arr.length}</span>
+      <span class="unread-dot"></span>
     </button>`;
   }).join("");
 
@@ -465,18 +1011,48 @@ function updateUnreadBadge() {
   }
 }
 
+function renderSkeletons() {
+  return Array.from({ length: 3 }).map(() => `
+    <div class="skeleton-card">
+      <div class="sk star"></div>
+      <div class="sk serial"></div>
+      <div class="sk title"></div>
+      <div class="sk date"></div>
+      <div class="sk tag"></div>
+    </div>
+  `).join("");
+}
+
 function renderGrid() {
   const q = searchQuery.toLowerCase().trim();
   const tag = state.activeTag;
   const source = activeNoticesForTag(tag);
   const list = source.filter(n => !q || n.title.toLowerCase().includes(q)).filter(isInDateRange);
+  const isLoading = state.streamActive && source.length === 0;
+
+  if (isLoading) {
+    gridEl.innerHTML = renderSkeletons();
+    return;
+  }
 
   if (!list.length) {
-    let msg;
-    if (tag === "STARRED") msg = "No starred notices yet — click ☆ on any card.";
-    else if (source.length) msg = "No matches for your filter.";
-    else msg = streamActive ? "Loading…" : "No notices yet — click Force crawl to load.";
-    gridEl.innerHTML = `<div class="empty">${escapeHtml(msg)}</div>`;
+    let title, sub;
+    if (tag === "STARRED") {
+      title = "No starred notices";
+      sub = "Click the ☆ icon on any notice to save it here.";
+    } else if (source.length) {
+      title = "No matches";
+      sub = "Try clearing search or filters.";
+    } else {
+      title = "Nothing loaded yet";
+      sub = "Click Refresh to fetch notices from all sources.";
+    }
+    gridEl.innerHTML = `
+      <div class="empty">
+        <div class="empty-icon">📭</div>
+        <strong>${escapeHtml(title)}</strong>
+        <div>${escapeHtml(sub)}</div>
+      </div>`;
     return;
   }
 
@@ -485,11 +1061,13 @@ function renderGrid() {
     const isRead = userState.readUrls.has(n.url);
     const isStarred = userState.starredUrls.has(n.url);
     const kw = matchesKeywords(n.title);
-    const cls = ["card"]; if (!isRead) cls.push("unread"); if (isStarred) cls.push("starred");
+    const cls = ["card"];
+    if (!isRead) cls.push("unread");
+    if (isStarred) cls.push("starred");
     const sectionBadge = (tag === "ALL" && n.section) ? `<span class="section-badge">${escapeHtml(n.section)}</span>` : "";
     return `
-      <div class="${cls.join(" ")}" style="animation-delay:${Math.min(i * 15, 250)}ms">
-        <button class="star-btn ${isStarred ? "on" : ""}" data-star="${escapeHtml(n.url)}">${isStarred ? "★" : "☆"}</button>
+      <div class="${cls.join(" ")}" style="animation-delay:${Math.min(i * 12, 200)}ms">
+        <button class="star-btn ${isStarred ? "on" : ""}" data-star="${escapeHtml(n.url)}" title="Star">${isStarred ? "★" : "☆"}</button>
         <span class="serial">${i + 1}.</span>
         <a class="title" href="${n.url}" target="_blank" rel="noopener" data-read="${escapeHtml(n.url)}">
           ${highlightTitle(n.title)}${kw ? ' <span style="color:#fbbf24;font-size:11px">●</span>' : ''}
@@ -497,13 +1075,29 @@ function renderGrid() {
         ${stamp ? `<span class="date">${escapeHtml(stamp)}</span>` : ""}
         ${sectionBadge}
         <span class="tag ${n.cls || ""}">${n.tag === "Dhaka" ? "DHAKA" : n.tag}</span>
-      </div>
-    `;
+      </div>`;
   }).join("");
 }
 
-function renderAll() { renderTabs(); renderGrid(); updateUnreadBadge(); }
+function renderMeta() {
+  const total = SITES.reduce((s, x) => s + (state.feed[x.tag]?.length || 0), 0);
+  if (state.updatedAt) {
+    updatedEl.textContent = `Updated ${relativeTime(state.updatedAt)} · ${total} notices cached`;
+  } else {
+    updatedEl.textContent = "Waiting for first crawl…";
+  }
+}
 
+function renderAll() {
+  renderTabs();
+  renderGrid();
+  renderMeta();
+  updateUnreadBadge();
+}
+
+// ============================================================
+// EVENTS
+// ============================================================
 tabsEl.addEventListener("click", (e) => {
   const btn = e.target.closest(".tab");
   if (!btn) return;
@@ -537,21 +1131,18 @@ keywordsEl.addEventListener("input", (e) => {
   settings.keywords = e.target.value.split(",").map(k => k.trim()).filter(Boolean);
   saveSettings(); renderGrid();
 });
+
 document.getElementById("forceRefresh").addEventListener("click", forceCrawl);
 document.getElementById("clear").addEventListener("click", () => {
   localStorage.removeItem(LOCAL_CACHE_KEY);
-  state.feed = {}; state.updatedAt = null; state.lastCrawledAt = null;
+  state.feed = {}; state.updatedAt = null; state.lastCrawledAt = null; state.siteLoaded = {};
   renderAll();
   setStatus("Local cache cleared.", "warn");
 });
 
-setInterval(() => {
-  const total = SITES.reduce((s, x) => s + (state.feed[x.tag]?.length || 0), 0);
-  updatedEl.textContent = state.updatedAt
-    ? `Data updated ${relativeTime(state.updatedAt)} · ${total} notices cached · auto-polls every 5 min`
-    : "Waiting for first crawl…";
-}, 30000);
-
+// ============================================================
+// INIT
+// ============================================================
 (function init() {
   loadSettings();
   loadUserState();
@@ -561,24 +1152,22 @@ setInterval(() => {
 
   if (loadLocalFeed()) {
     renderAll();
-    setStatus(`Loaded from local cache · updated ${relativeTime(state.updatedAt)}`);
+    setStatus(`Loaded from cache · updated ${relativeTime(state.updatedAt)}`, "ok");
   } else {
-    gridEl.innerHTML = `<div class="empty">Loading…</div>`;
+    renderAll();
   }
 
   log(`✓ Endpoint: ${VERCEL_ENDPOINT}`);
 
-  // Start streaming fetch
   (async () => {
     const ok = await fetchFeedStreaming();
     if (!ok && !state.updatedAt) {
-      setStatus("Vercel endpoint not responding — click Force crawl.", "err");
+      setStatus("Endpoint not responding — try refreshing.", "err");
     }
   })();
 
-  // Periodic re-poll
   pollTimer = setInterval(async () => {
-    if (streamActive) return;
+    if (state.streamActive) return;
     await fetchFeedStreaming();
   }, POLL_MS);
 })();
